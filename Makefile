@@ -3,7 +3,7 @@ CXX       = g++
 DEFINES   = -DDISABLE_RANDOM_SEED
 
 # флаги компиляции
-CXXFLAGS  =
+CXXFLAGS += -fopenmp
 CXXFLAGS += -std=c++11 -O2
 CXXFLAGS += -g
 CXXFLAGS += -Wall -Wextra

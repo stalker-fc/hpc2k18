@@ -9,6 +9,8 @@
 
 #include "types.hh"     // for size3, Vector, Zeta, ACF, AR_coefs
 #include "autoreg.hh"   // for mean, variance, ACF_variance, approx_acf, comp...
+#include <chrono>
+
 
 /// @file
 /// Some abbreviations used throughout the programme.
@@ -39,19 +41,62 @@ struct Autoreg_model {
 
 	void act() {
 		echo_parameters();
+		std::clog << "zsize\t\tacf_size\tфункция\t\t\t\tвремя работы" << std::endl;
+		std::string beginning_of_line = "(" + std::to_string(zsize(0)) + ", " + std::to_string(zsize(1))
+                                   + ", " + std::to_string(zsize(2))
+                                   + ")\t(" + std::to_string(acf_size(0)) + ", "
+                                   + std::to_string(acf_size(1))
+                                   + ", " + std::to_string(acf_size(2)) + ")\t";
+                                   
+		std::chrono::steady_clock::time_point start_time;
+		std::chrono::steady_clock::time_point end_time;
+		
+		start_time = std::chrono::steady_clock::now();
 		ACF<T> acf_model = approx_acf<T>(alpha, beta, gamm, acf_delta, acf_size);
+		end_time = std::chrono::steady_clock::now();
+		auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "approx_acf\t" << diff << " ms" << std::endl;
+		
 		//{ std::ofstream out("acf"); out << acf_model; }
+		start_time = std::chrono::steady_clock::now();
 		AR_coefs<T> ar_coefs = compute_AR_coefs(acf_model);
+		end_time = std::chrono::steady_clock::now();
+		diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "compute_AR_coefs\t" << diff << " ms" << std::endl;
+		
+		start_time = std::chrono::steady_clock::now();
 		T var_wn = white_noise_variance(ar_coefs, acf_model);
-		std::clog << "ACF variance = " << ACF_variance(acf_model) << std::endl;
-		std::clog << "WN variance = " << var_wn << std::endl;
+		end_time = std::chrono::steady_clock::now();
+		diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "white_noise_variance\t" << diff << " ms" << std::endl;
+		
+		//std::clog << "ACF variance = " << ACF_variance(acf_model) << std::endl;
+		//std::clog << "WN variance = " << var_wn << std::endl;
+
+		start_time = std::chrono::steady_clock::now();
 		Zeta<T> zeta2 = generate_white_noise(zsize2, var_wn);
-		std::clog << "mean(eps) = " << mean(zeta2) << std::endl;
-		std::clog << "variance(eps) = " << variance(zeta2) << std::endl;
+		end_time = std::chrono::steady_clock::now();
+		diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "generate_white_noise\t" << diff << " ms" << std::endl;
+		
+		//std::clog << "mean(eps) = " << mean(zeta2) << std::endl;
+		//std::clog << "variance(eps) = " << variance(zeta2) << std::endl;
+
+		start_time = std::chrono::steady_clock::now();
 		generate_zeta(ar_coefs, zeta2);
-		std::clog << "mean(zeta) = " << mean(zeta2) << std::endl;
-		std::clog << "variance(zeta) = " << variance(zeta2) << std::endl;
+		end_time = std::chrono::steady_clock::now();
+		diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "generate_zeta\t" << diff << " ms" << std::endl;
+		
+		//std::clog << "mean(zeta) = " << mean(zeta2) << std::endl;
+		//std::clog << "variance(zeta) = " << variance(zeta2) << std::endl;
+
+		start_time = std::chrono::steady_clock::now();
 		Zeta<T> zeta = trim_zeta(zeta2, zsize);
+		end_time = std::chrono::steady_clock::now();
+		diff = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+		std::clog << beginning_of_line <<  "trim_zeta\t" << diff << " ms" << std::endl;
+		
 		write_zeta(zeta);
 	}
 

@@ -11,7 +11,9 @@
 #include <fstream>               // for ofstream
 #include <random>                // for mt19937, normal_distribution
 #include <stdexcept>             // for runtime_error
-
+#include <vector>
+#include <thread>
+#include "parallel_mt.hh"
 #include <blitz/array.h>         // for Array, Range, shape, any
 
 #include "sysv.hh"               // for sysv
@@ -131,17 +133,56 @@ namespace autoreg {
 		if (variance < T(0)) {
 			throw std::runtime_error("variance is less than zero");
 		}
-
-		// инициализация генератора
-		std::mt19937 generator;
-		#if !defined(DISABLE_RANDOM_SEED)
-		generator.seed(std::chrono::steady_clock::now().time_since_epoch().count());
-		#endif
-		std::normal_distribution<T> normal(T(0), std::sqrt(variance));
-
-		// генерация и проверка
+		
+		
+		int n = 8;
+        std::ifstream init_data("init_data");
+        std::vector<parallel_mt> generators;
+                        
+        for (int i = 0; i < n; i++) {
+            mt_config config;
+            init_data >> config;
+            generators.push_back(parallel_mt(config));
+        }
+   		
+   		
+        std::normal_distribution<T> normal(T(0), std::sqrt(variance));
+        
+        
 		Zeta<T> eps(size);
-		std::generate(std::begin(eps), std::end(eps), std::bind(normal, generator));
+        
+        
+        std::vector<std::thread> threads;
+        auto cur_begin = std::begin(eps);
+        int step = size(0) * size(1) * size(2) / n;
+        
+        
+        for (int i = 0; i < n; i++) {
+            auto cur_end = std::next(cur_begin, step);
+            auto cur_gen = std::bind(normal, generators[i]);
+            std::thread cur_thread(
+					std::generate<decltype(cur_begin), decltype(cur_gen)>, 
+					cur_begin, cur_end, 
+					cur_gen);
+					
+            threads.push_back(std::move(cur_thread));
+			cur_begin = cur_end;
+        }
+        auto cur_end = std::end(eps);
+        auto cur_gen = std::bind(normal, generators[n - 1]);
+        std::thread cur_thread(
+					std::generate<decltype(cur_begin), decltype(cur_gen)>, 
+					cur_begin, cur_end, 
+					cur_gen);
+        threads.push_back(std::move(cur_thread));
+		
+		
+		for(auto& cur_thread : threads){
+			cur_thread.join();
+		}
+		
+		
+		//Проверка
 		if (std::any_of(std::begin(eps), std::end(eps), &::autoreg::isnan<T>)) {
 			throw std::runtime_error("white noise generator produced some NaNs");
 		}
